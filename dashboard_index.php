@@ -1,61 +1,83 @@
 <?php
-// dashboard_index.php - 后台仪表板主页
+// dashboard_index.php - 后台仪表板主页（文件系统版本）
+// 直接从 /userss/ 目录中读取用户数据
 
-require_once 'dashboard_auth.php';
-check_admin_login(); // 检查登录状态
+session_start();
 
-$conn = get_db_connection();
+// 检查登录状态
+if (!isset($_SESSION['admin'])) {
+    header("Location: dashboard_login.php");
+    exit;
+}
 
-// -----------------------------------------------------------------------------
-// 1. 数据统计逻辑
-// -----------------------------------------------------------------------------
+$admin = $_SESSION['admin'];
+$admin_path = "userss/" . $admin;
+
+// 验证管理员目录是否存在
+if (!is_dir($admin_path)) {
+    session_destroy();
+    header("Location: dashboard_login.php");
+    exit;
+}
+
+// 读取公告
+$announcement_file = $admin_path . "/admin/set/announcement";
+$announcement = file_exists($announcement_file) ? file_get_contents($announcement_file) : "欢迎使用易对接平台！";
+$message = '';
+
+// 处理公告更新
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['announcement_content'])) {
+    $new_announcement = $_POST['announcement_content'];
+    if (file_put_contents($announcement_file, $new_announcement) !== false) {
+        $announcement = $new_announcement;
+        $message = '<div class="alert success">✓ 公告更新成功！</div>';
+    } else {
+        $message = '<div class="alert error">✗ 公告更新失败，请检查目录权限。</div>';
+    }
+}
+
+// 统计数据
 $stats = [
     'total_users' => 0,
     'vip_active' => 0,
     'vip_expired' => 0,
-    'total_money' => 0.00,
+    'total_money' => 0,
     'total_docs' => 0,
 ];
 
-// 总用户数
-$result = $conn->query("SELECT COUNT(*) AS count FROM users");
-$stats['total_users'] = $result->fetch_assoc()['count'];
-
-// 会员状态
-$now = time();
-$result = $conn->query("SELECT COUNT(*) AS count FROM users WHERE viptime > {$now}");
-$stats['vip_active'] = $result->fetch_assoc()['count'];
-$stats['vip_expired'] = $stats['total_users'] - $stats['vip_active'];
-
-// 总余额
-$result = $conn->query("SELECT SUM(money) AS total FROM users");
-$stats['total_money'] = number_format($result->fetch_assoc()['total'] ?? 0, 2);
-
-// 总文档数
-$result = $conn->query("SELECT SUM(doc_count) AS total FROM users");
-$stats['total_docs'] = $result->fetch_assoc()['total'] ?? 0;
-
-// -----------------------------------------------------------------------------
-// 2. 公告管理逻辑
-// -----------------------------------------------------------------------------
-$announcement = get_config('announcement');
-$message = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['announcement_content'])) {
-    $new_announcement = $_POST['announcement_content'];
-    if (update_config('announcement', $new_announcement)) {
-        $announcement = $new_announcement; // 更新页面显示
-        $message = '<div class="alert success">公告更新成功！</div>';
-    } else {
-        $message = '<div class="alert error">公告更新失败，请检查数据库连接。</div>';
+$users_dir = $admin_path . "/userss";
+if (is_dir($users_dir)) {
+    $users = scandir($users_dir);
+    foreach ($users as $user) {
+        if ($user === '.' || $user === '..') continue;
+        
+        $user_path = $users_dir . "/" . $user;
+        if (!is_dir($user_path)) continue;
+        
+        $stats['total_users']++;
+        
+        // 读取会员时间
+        $viptime_file = $user_path . "/viptime";
+        $viptime = file_exists($viptime_file) ? (int)trim(file_get_contents($viptime_file)) : 0;
+        if ($viptime > time()) {
+            $stats['vip_active']++;
+        } else {
+            $stats['vip_expired']++;
+        }
+        
+        // 读取余额
+        $money_file = $user_path . "/money";
+        $money = file_exists($money_file) ? (float)trim(file_get_contents($money_file)) : 0;
+        $stats['total_money'] += $money;
+        
+        // 读取文档数量
+        $doc_file = $user_path . "/file_count";
+        $doc_count = file_exists($doc_file) ? (int)trim(file_get_contents($doc_file)) : 0;
+        $stats['total_docs'] += $doc_count;
     }
 }
 
-$conn->close();
-
-// -----------------------------------------------------------------------------
-// 3. HTML 页面输出
-// -----------------------------------------------------------------------------
+$stats['total_money'] = number_format($stats['total_money'], 2);
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -63,75 +85,83 @@ $conn->close();
     <meta charset="UTF-8">
     <title>后台仪表板 - 易对接</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; background-color: #f4f4f4; display: flex; }
-        .sidebar { width: 200px; background-color: #333; color: white; padding: 20px; height: 100vh; }
-        .sidebar h2 { color: white; margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 10px; }
-        .sidebar a { color: white; text-decoration: none; display: block; padding: 10px 0; border-bottom: 1px solid #444; }
-        .sidebar a:hover { background-color: #555; }
-        .content { flex-grow: 1; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fa; }
+        .container { display: flex; min-height: 100vh; }
+        .sidebar { width: 250px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar h2 { margin-bottom: 30px; font-size: 20px; }
+        .sidebar a { color: white; text-decoration: none; display: block; padding: 12px 15px; margin-bottom: 5px; border-radius: 5px; transition: background 0.3s; }
+        .sidebar a:hover { background-color: rgba(255, 255, 255, 0.2); }
+        .content { margin-left: 250px; flex-grow: 1; padding: 30px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .header h1 { color: #333; font-size: 28px; }
+        .logout-btn { background-color: #d32f2f; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; }
+        .logout-btn:hover { background-color: #b71c1c; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        .stat-card h3 { margin-top: 0; color: #555; font-size: 16px; }
-        .stat-card p { font-size: 32px; font-weight: bold; color: #333; margin: 5px 0 0 0; }
-        .announcement-section { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        .announcement-section h2 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
-        .announcement-section textarea { width: 100%; height: 150px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical; margin-bottom: 10px; box-sizing: border-box; }
-        .announcement-section button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .announcement-section button:hover { background-color: #0056b3; }
-        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; }
-        .alert.success { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
-        .alert.error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+        .stat-card { background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .stat-card h3 { color: #666; font-size: 14px; margin-bottom: 10px; }
+        .stat-card p { font-size: 32px; font-weight: bold; color: #667eea; }
+        .announcement-section { background-color: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .announcement-section h2 { color: #333; margin-bottom: 15px; font-size: 20px; }
+        .announcement-section textarea { width: 100%; height: 150px; padding: 12px; border: 1px solid #ddd; border-radius: 5px; resize: vertical; margin-bottom: 15px; font-family: Arial, sans-serif; }
+        .announcement-section button { padding: 12px 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .announcement-section button:hover { opacity: 0.9; }
+        .alert { padding: 12px 15px; border-radius: 5px; margin-bottom: 15px; }
+        .alert.success { background-color: #c8e6c9; color: #2e7d32; }
+        .alert.error { background-color: #ffcdd2; color: #c62828; }
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <h2>易对接管理</h2>
-        <a href="dashboard_index.php">仪表板</a>
-        <a href="dashboard_user_manage.php">用户管理</a>
-        <a href="dashboard_settings.php">账号设置</a>
-        <a href="dashboard_logout.php">退出登录</a>
-    </div>
-
-    <div class="content">
-        <div class="header">
-            <h1>欢迎回来，<?php echo htmlspecialchars($_SESSION['username']); ?></h1>
+    <div class="container">
+        <div class="sidebar">
+            <h2>易对接管理</h2>
+            <a href="dashboard_index.php">📊 仪表板</a>
+            <a href="dashboard_user_manage.php">👥 用户管理</a>
+            <a href="dashboard_settings.php">⚙️ 账号设置</a>
+            <a href="dashboard_logout.php">🚪 退出登录</a>
         </div>
 
-        <?php echo $message; ?>
+        <div class="content">
+            <div class="header">
+                <h1>欢迎回来，<?php echo htmlspecialchars($admin); ?></h1>
+                <a href="dashboard_logout.php" class="logout-btn">退出登录</a>
+            </div>
 
-        <!-- 数据统计 -->
-        <h2>平台数据概览</h2>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>总用户数</h3>
-                <p><?php echo $stats['total_users']; ?></p>
-            </div>
-            <div class="stat-card">
-                <h3>活跃会员数</h3>
-                <p><?php echo $stats['vip_active']; ?></p>
-            </div>
-            <div class="stat-card">
-                <h3>会员到期用户数</h3>
-                <p><?php echo $stats['vip_expired']; ?></p>
-            </div>
-            <div class="stat-card">
-                <h3>平台总余额</h3>
-                <p>¥<?php echo $stats['total_money']; ?></p>
-            </div>
-            <div class="stat-card">
-                <h3>总文档数量</h3>
-                <p><?php echo $stats['total_docs']; ?></p>
-            </div>
-        </div>
+            <?php echo $message; ?>
 
-        <!-- 公告管理 -->
-        <div class="announcement-section">
-            <h2>公告管理</h2>
-            <form method="POST">
-                <textarea name="announcement_content" placeholder="输入新的平台公告内容..."><?php echo htmlspecialchars($announcement); ?></textarea>
-                <button type="submit">更新公告</button>
-            </form>
+            <!-- 数据统计 -->
+            <h2 style="color: #333; margin-bottom: 20px;">平台数据概览</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>总用户数</h3>
+                    <p><?php echo $stats['total_users']; ?></p>
+                </div>
+                <div class="stat-card">
+                    <h3>活跃会员数</h3>
+                    <p><?php echo $stats['vip_active']; ?></p>
+                </div>
+                <div class="stat-card">
+                    <h3>会员到期用户数</h3>
+                    <p><?php echo $stats['vip_expired']; ?></p>
+                </div>
+                <div class="stat-card">
+                    <h3>平台总余额</h3>
+                    <p>¥<?php echo $stats['total_money']; ?></p>
+                </div>
+                <div class="stat-card">
+                    <h3>总文档数量</h3>
+                    <p><?php echo $stats['total_docs']; ?></p>
+                </div>
+            </div>
+
+            <!-- 公告管理 -->
+            <div class="announcement-section">
+                <h2>公告管理</h2>
+                <form method="POST">
+                    <textarea name="announcement_content" placeholder="输入新的平台公告内容..."><?php echo htmlspecialchars($announcement); ?></textarea>
+                    <button type="submit">更新公告</button>
+                </form>
+            </div>
         </div>
     </div>
 </body>

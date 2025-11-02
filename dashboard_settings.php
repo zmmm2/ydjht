@@ -1,52 +1,49 @@
 <?php
-// dashboard_settings.php - 后台账号设置页面
+// dashboard_settings.php - 后台账号设置页面（文件系统版本）
 
-require_once 'dashboard_auth.php';
-check_admin_login(); // 检查登录状态
+session_start();
 
-$conn = get_db_connection();
+if (!isset($_SESSION['admin'])) {
+    header("Location: dashboard_login.php");
+    exit;
+}
+
+$admin = $_SESSION['admin'];
+$admin_path = "userss/" . $admin;
+
+if (!is_dir($admin_path)) {
+    session_destroy();
+    header("Location: dashboard_login.php");
+    exit;
+}
+
 $message = '';
-$username = $_SESSION['username'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $current_pass = $_POST['current_pass'] ?? '';
     $new_pass = $_POST['new_pass'] ?? '';
     $confirm_pass = $_POST['confirm_pass'] ?? '';
     
-    // 1. 验证当前密码
-    // ！！！安全警告：这里使用简化的验证，请替换为安全的哈希验证！！！
-    if ($current_pass !== '123456') { // 假设当前密码是123456
-        $message = '<div class="alert error">当前密码错误！</div>';
+    $pass_file = $admin_path . "/admin/passprotect556";
+    $stored_pass = trim(file_get_contents($pass_file));
+    
+    if ($current_pass !== $stored_pass) {
+        $message = '<div class="alert error">✗ 当前密码错误！</div>';
     } elseif ($new_pass !== $confirm_pass) {
-        $message = '<div class="alert error">新密码和确认密码不一致！</div>';
-    } elseif (strlen($new_pass) < 6) {
-        $message = '<div class="alert error">新密码长度不能少于6位！</div>';
+        $message = '<div class="alert error">✗ 新密码和确认密码不一致！</div>';
+    } elseif (strlen($new_pass) < 1) {
+        $message = '<div class="alert error">✗ 新密码不能为空！</div>';
     } else {
-        // 2. 更新密码
-        // ！！！安全警告：以下是临时简化的更新逻辑，请替换为安全的哈希存储！！！
-        // 实际应用中应该使用：$hashed_password = password_hash($new_pass, PASSWORD_DEFAULT);
-        // $stmt = $conn->prepare("UPDATE dashboard_users SET password = ? WHERE id = ?");
-        // $stmt->bind_param("si", $hashed_password, $_SESSION['admin_id']);
-        
-        // 由于我们无法在沙盒中运行代码，这里无法真正更新数据库中的哈希密码。
-        // 为了演示逻辑，我们假设更新成功，并提示用户需要手动更新数据库。
-        $message = '<div class="alert success">密码更新请求已处理。**请注意：由于沙盒环境限制，您需要手动在数据库的 `dashboard_users` 表中更新 ID 为 ' . $_SESSION['admin_id'] . ' 的用户的密码字段为新密码的哈希值。**</div>';
-        
-        // 假设更新成功
-        // $success = $stmt->execute();
-        // if ($success) {
-        //     $message = '<div class="alert success">密码修改成功！请使用新密码重新登录。</div>';
-        //     // 销毁 session，强制重新登录
-        //     session_destroy();
-        //     header("Refresh: 3; url=dashboard_login.php");
-        //     exit;
-        // } else {
-        //     $message = '<div class="alert error">密码修改失败，请联系管理员。</div>';
-        // }
+        if (file_put_contents($pass_file, $new_pass) !== false) {
+            $message = '<div class="alert success">✓ 密码修改成功！请使用新密码重新登录。</div>';
+            // 销毁 session，强制重新登录
+            session_destroy();
+            echo '<meta http-equiv="refresh" content="2;url=dashboard_login.php">';
+        } else {
+            $message = '<div class="alert error">✗ 密码修改失败，请检查目录权限。</div>';
+        }
     }
 }
-
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -54,59 +51,64 @@ $conn->close();
     <meta charset="UTF-8">
     <title>账号设置 - 易对接</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; background-color: #f4f4f4; display: flex; }
-        .sidebar { width: 200px; background-color: #333; color: white; padding: 20px; height: 100vh; }
-        .sidebar h2 { color: white; margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 10px; }
-        .sidebar a { color: white; text-decoration: none; display: block; padding: 10px 0; border-bottom: 1px solid #444; }
-        .sidebar a:hover { background-color: #555; }
-        .content { flex-grow: 1; padding: 20px; }
-        h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        .settings-form { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); max-width: 500px; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input[type="password"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        .btn-submit { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .btn-submit:hover { background-color: #0056b3; }
-        .alert { padding: 10px; border-radius: 4px; margin-bottom: 15px; }
-        .alert.success { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
-        .alert.error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f7fa; }
+        .container { display: flex; min-height: 100vh; }
+        .sidebar { width: 250px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar h2 { margin-bottom: 30px; font-size: 20px; }
+        .sidebar a { color: white; text-decoration: none; display: block; padding: 12px 15px; margin-bottom: 5px; border-radius: 5px; transition: background 0.3s; }
+        .sidebar a:hover { background-color: rgba(255, 255, 255, 0.2); }
+        .content { margin-left: 250px; flex-grow: 1; padding: 30px; }
+        h1 { color: #333; margin-bottom: 20px; }
+        .settings-form { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); max-width: 500px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+        .form-group input[type="text"], .form-group input[type="password"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 14px; }
+        .form-group input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 5px rgba(102, 126, 234, 0.3); }
+        .btn-submit { padding: 12px 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .btn-submit:hover { opacity: 0.9; }
+        .alert { padding: 12px 15px; border-radius: 5px; margin-bottom: 20px; }
+        .alert.success { background-color: #c8e6c9; color: #2e7d32; }
+        .alert.error { background-color: #ffcdd2; color: #c62828; }
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <h2>易对接管理</h2>
-        <a href="dashboard_index.php">仪表板</a>
-        <a href="dashboard_user_manage.php">用户管理</a>
-        <a href="dashboard_settings.php">账号设置</a>
-        <a href="dashboard_logout.php">退出登录</a>
-    </div>
+    <div class="container">
+        <div class="sidebar">
+            <h2>易对接管理</h2>
+            <a href="dashboard_index.php">📊 仪表板</a>
+            <a href="dashboard_user_manage.php">👥 用户管理</a>
+            <a href="dashboard_settings.php">⚙️ 账号设置</a>
+            <a href="dashboard_logout.php">🚪 退出登录</a>
+        </div>
 
-    <div class="content">
-        <h1>账号设置</h1>
+        <div class="content">
+            <h1>⚙️ 账号设置</h1>
 
-        <?php echo $message; ?>
-        
-        <div class="settings-form">
-            <h2>修改密码</h2>
-            <form method="POST">
-                <div class="form-group">
-                    <label for="username">当前管理员账号</label>
-                    <input type="text" id="username" value="<?php echo htmlspecialchars($username); ?>" disabled>
-                </div>
-                <div class="form-group">
-                    <label for="current_pass">当前密码</label>
-                    <input type="password" id="current_pass" name="current_pass" required>
-                </div>
-                <div class="form-group">
-                    <label for="new_pass">新密码</label>
-                    <input type="password" id="new_pass" name="new_pass" required>
-                </div>
-                <div class="form-group">
-                    <label for="confirm_pass">确认新密码</label>
-                    <input type="password" id="confirm_pass" name="confirm_pass" required>
-                </div>
-                <button type="submit" class="btn-submit">修改密码</button>
-            </form>
+            <?php echo $message; ?>
+
+            <div class="settings-form">
+                <h2 style="margin-bottom: 20px;">修改密码</h2>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="username">当前管理员账号</label>
+                        <input type="text" id="username" value="<?php echo htmlspecialchars($admin); ?>" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="current_pass">当前密码</label>
+                        <input type="password" id="current_pass" name="current_pass" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new_pass">新密码</label>
+                        <input type="password" id="new_pass" name="new_pass" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_pass">确认新密码</label>
+                        <input type="password" id="confirm_pass" name="confirm_pass" required>
+                    </div>
+                    <button type="submit" class="btn-submit">修改密码</button>
+                </form>
+            </div>
         </div>
     </div>
 </body>
