@@ -1,0 +1,43 @@
+后台php源码功能支持有:
+1.用户系统    2.卡密系统
+3.论坛系统    4.抽奖系统
+5.聊天系统    6.远程更新
+7.钓鱼系统    8.投票系统
+9.应用托管    10.客服系统
+11.兑换系统   12.反馈系统 
+13.审核列表   14.维护系统
+15.私聊系统   16.公共API 
+17.文件托管   18.商城系统
+功能很强大！懂的都懂
+
+搭建教程：
+
+1.下载源码上传到宝塔
+
+2.下载php7.1
+
+3.进入php7.1管理-配置文件-在477行找到display_errors = on
+
+4.把display_errors = on改成display_errors = off
+
+5.创建数据库-数据库名是appdoc-密码123456
+admin/iyu
+admin/docking链接改掉
+
+6.伪静态设置
+rewrite /passprotect556 404.html break;
+rewrite /keyprotect556 404.html break;
+
+注：
+生成卡密接口:
+后台链接/appdoc_vip_add.php?pass1=zxcv25&num=卡密生成的数量&time=卡密时间单位:秒&type=卡密类型 vip或money{vip:会员卡密，money:余额卡密}
+例如:http://baidu.com/appdoc_vip_add.php?pass1=zxcv25&num=10&time=86400&type=vip
+访问后会返回对应的卡密信息，一行一个，生成后记得保存好
+
+添加文档数量接口:
+后台链接/fileadmin-admin.php?pass=zxcv25&num=给予的数量&admin=用户名
+访问链接后返回结果
+
+添加用户余额接口:
+后台链接/moneyadd-admin.php?pass=zxcv25&num=给予的余额&admin=用户名
+访问链接后返回结果
