@@ -1,0 +1,17 @@
+生成卡密接口:
+后台链接/appdoc_vip_add.php?pass1=zxc123.0&num=卡密生成的数量&time=卡密时间单位:秒&type=卡密类型 vip或money{vip:会员卡密，money:余额卡密}
+例如:http://baidu.com/appdoc_vip_add.php?pass1=zxc123.0&num=10&time=86400&type=vip
+访问后会返回对应的卡密信息，一行一个，生成后记得保存好
+
+添加文档数量接口:
+后台链接/fileadmin-admin.php?pass=zxc123.0&num=给予的数量&admin=用户名
+访问链接后返回结果
+
+添加用户余额接口:
+后台链接/moneyadd-admin.php?pass=zxc123.0&num=给予的余额&admin=用户名
+访问链接后返回结果
+
+注意:appdoc_vip_add.php,fileadmin-admin.php,moneyadd-admin.php文件内的密码一定要改一下，改成自己记得住的其他密码
+注意:appdoc_vip_add.php,fileadmin-admin.php,moneyadd-admin.php文件内的密码一定要改一下，改成自己记得住的其他密码
+注意:appdoc_vip_add.php,fileadmin-admin.php,moneyadd-admin.php文件内的密码一定要改一下，改成自己记得住的其他密码
+不然安全性可能出现问题，不然安全性可能出现问题，不然安全性可能出现问题，不然安全性可能出现问题
