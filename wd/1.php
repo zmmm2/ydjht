@@ -1,0 +1,70 @@
+<?php
+$url = 'https://fs-im-kefu.7moor-fs1.com/29397395/4d2c3f00-7d4c-11e5-af15-41bf63ae4ea0/1690634180073/backgrounderaser_1690376115.png'; // 远程图片URL
+$save_as = 'local_image.png'; // 保存到本地的文件名
+$max_width = 400; // 调整后的最大宽度
+$max_height = 200; // 调整后的最大高度
+
+// 检查远程URL是否可访问，并且返回的是否是有效的图像数据
+if (!@getimagesize($url)) {
+    die('Invalid image URL');
+}
+
+// 初始化cURL
+$ch = curl_init();
+
+// 设置cURL选项
+curl_setopt($ch, CURLOPT_URL, $url);
+// 将响应输出到变量而不是屏幕上
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+
+// 执行cURL请求
+$image_data = curl_exec($ch);
+
+// 关闭cURL句柄
+curl_close($ch);
+
+// 检查本地文件夹是否存在并且可写
+if (!is_dir(dirname($save_as)) || !is_writable(dirname($save_as))) {
+    die('Cannot write to local folder');
+}
+
+// 创建图像资源
+$image = imagecreatefromstring($image_data);
+
+// 获取图像宽度和高度
+$width = imagesx($image);
+$height = imagesy($image);
+
+// 计算调整后的宽度和高度
+if ($width > $max_width || $height > $max_height) {
+    $ratio = min($max_width / $width, $max_height / $height);
+    $new_width = round($width * $ratio);
+    $new_height = round($height * $ratio);
+} else {
+    $new_width = $width;
+    $new_height = $height;
+}
+
+// 如果原始图像的宽度和高度都小于等于最大宽度和最大高度，则不进行缩放
+if ($width <= $max_width && $height <= $max_height) {
+    $new_width = $width;
+    $new_height = $height;
+}
+
+// 创建调整后的图像资源
+$new_image = imagecreatetruecolor($new_width, $new_height);
+
+// 将原始图像复制到调整后的图像中
+imagecopyresampled($new_image, $image, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+
+// 保存调整后的图像到本地文件
+imagejpeg($new_image, $save_as);
+
+// 输出图片
+header('Content-Type: image/jpeg');
+readfile($save_as);
+
+// 释放资源
+imagedestroy($image);
+imagedestroy($new_image);
+?>
