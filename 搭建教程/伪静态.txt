@@ -1,0 +1,2 @@
+rewrite /passprotect556 404.html break;
+rewrite /keyprotect556 404.html break;
